@@ -112,17 +112,7 @@ fun Contenido(
             startDestination = "inicio" // Ruta inicial por defecto
         ) {
             composable("inicio") { 
-                Box(
-                    modifier = Modifier.fillMaxSize(), 
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "¡Bienvenido a la Tienda Virtual!", 
-                        fontSize = 20.sp, 
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                ScreenHome(navController)
             }
 
             composable("productos") { 
