@@ -130,6 +130,8 @@ fun Contenido(
                 arguments = listOf(navArgument("id") { type = NavType.IntType })
             ) { backStackEntry ->
                 val id = backStackEntry.arguments!!.getInt("id")
+                // Escondemos las barras superior e inferior en esta vista si es posible, 
+                // o simplemente mostramos la pantalla inmersiva sobre el Scaffold.
                 ScreenProductDetail(navController, servicio, id)
             }
         }
