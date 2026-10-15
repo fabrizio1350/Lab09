@@ -146,3 +146,8 @@ fun Contenido(
         }
     }
 }
+
+@Composable
+fun ScreenInicio() {
+    Text("INICIO")
+}
