@@ -56,3 +56,46 @@ fun ScreenPosts(navController: NavHostController, servicio: PostApiService) {
         }
     }
 }
+
+@Composable
+fun ScreenPost(navController: NavHostController, servicio: PostApiService, id: Int) {
+    var post by remember { mutableStateOf<PostModel?>(null) }
+    
+    LaunchedEffect(Unit) {
+        val xpost = servicio.getUserPostById(id)
+        post = xpost.copy().takeIf { xpost.body != null }
+    }
+    
+    Column(
+        Modifier
+            .padding(8.dp)
+            .fillMaxSize()
+    ) {
+        if (post != null) {
+            OutlinedTextField(
+                value = post!!.id.toString(),
+                onValueChange = {},
+                label = { Text("id") },
+                readOnly = true
+            )
+            OutlinedTextField(
+                value = post!!.userId.toString(),
+                onValueChange = {},
+                label = { Text("userId") },
+                readOnly = true
+            )
+            OutlinedTextField(
+                value = post!!.title.toString(),
+                onValueChange = {},
+                label = { Text("title") },
+                readOnly = true
+            )
+            OutlinedTextField(
+                value = post!!.body.toString(),
+                onValueChange = {},
+                label = { Text("body") },
+                readOnly = true
+            )
+        }
+    }
+}
