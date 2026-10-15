@@ -22,7 +22,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.ui.graphics.Color
 import com.example.aplicacion.ui.theme.APLICACIONTheme
+import com.example.aplicacion.ui.theme.PrimaryMarket
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -64,19 +66,21 @@ fun BarraSuperior() {
         title = {
             Text(
                 text = "DummyJSON Market",
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary
+                fontWeight = FontWeight.ExtraBold,
+                color = PrimaryMarket
             )
         },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primary
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.White
         )
     )
 }
 
 @Composable
 fun BarraInferior(navController: NavHostController) {
-    NavigationBar {
+    NavigationBar(
+        containerColor = Color.White
+    ) {
         NavigationBarItem(
             icon = { Icon(Icons.Outlined.Home, contentDescription = "Inicio") },
             label = { Text("Inicio") },

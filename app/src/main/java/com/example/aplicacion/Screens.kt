@@ -1,16 +1,22 @@
 package com.example.aplicacion
 
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material3.*
@@ -21,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,14 +38,25 @@ import com.example.aplicacion.ui.theme.*
 
 @Composable
 fun ScreenProducts(navController: NavHostController, servicio: ProductApiService) {
-    val listaProductos = remember { mutableStateListOf<ProductModel>() }
+    val allProducts = remember { mutableStateListOf<ProductModel>() }
+    var displayedProducts by remember { mutableStateOf(listOf<ProductModel>()) }
     var cargando by remember { mutableStateOf(true) }
 
+    // Estados para Filtro y Búsqueda
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    
+    // Obtenemos las categorías únicas a partir de los productos cargados
+    val categorias = remember(allProducts.size) { 
+        allProducts.map { it.category }.distinct() 
+    }
+
+    // Efecto para Cargar datos 1 sola vez
     LaunchedEffect(Unit) {
         try {
             val respuesta = servicio.getProducts()
-            listaProductos.clear()
-            listaProductos.addAll(respuesta.products)
+            allProducts.clear()
+            allProducts.addAll(respuesta.products)
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
@@ -46,25 +64,96 @@ fun ScreenProducts(navController: NavHostController, servicio: ProductApiService
         }
     }
 
-    // Fondo general gris clarito
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .background(MaterialTheme.colorScheme.background)) {
+    // Efecto para Filtrar en tiempo real (instantáneo)
+    LaunchedEffect(searchQuery, selectedCategory, allProducts.size) {
+        var filtrados = allProducts.toList()
         
+        if (selectedCategory != null) {
+            filtrados = filtrados.filter { it.category == selectedCategory }
+        }
+        
+        if (searchQuery.isNotEmpty()) {
+            filtrados = filtrados.filter { 
+                it.title.contains(searchQuery, ignoreCase = true) || 
+                it.description.contains(searchQuery, ignoreCase = true) 
+            }
+        }
+        
+        displayedProducts = filtrados
+    }
+
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .background(MaterialTheme.colorScheme.background)
+    ) {
+        // 1. Buscador
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            placeholder = { Text("Buscar productos...") },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Buscar", tint = PrimaryMarket) },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(Icons.Filled.Clear, contentDescription = "Limpiar")
+                    }
+                }
+            },
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedBorderColor = PrimaryMarket,
+                unfocusedBorderColor = Color.LightGray
+            ),
+            singleLine = true
+        )
+
+        // 2. Categorías Deslizables
+        if (categorias.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                item {
+                    CategoryChip(
+                        text = "Todos",
+                        isSelected = selectedCategory == null,
+                        onClick = { selectedCategory = null }
+                    )
+                }
+                items(categorias) { cat ->
+                    CategoryChip(
+                        text = cat.replaceFirstChar { it.uppercase() },
+                        isSelected = selectedCategory == cat,
+                        onClick = { selectedCategory = cat }
+                    )
+                }
+            }
+        }
+
+        // 3. Grid de Productos o Estado de Carga
         if (cargando) {
-            CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.align(Alignment.Center)
-            )
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = PrimaryMarket)
+            }
+        } else if (displayedProducts.isEmpty()) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text("No se encontraron productos :(", color = Color.Gray, fontWeight = FontWeight.SemiBold)
+            }
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.weight(1f)
             ) {
-                items(listaProductos) { producto ->
+                items(displayedProducts) { producto ->
                     ProductCard(producto = producto) {
                         navController.navigate("productDetail/${producto.id}")
                     }
@@ -75,33 +164,48 @@ fun ScreenProducts(navController: NavHostController, servicio: ProductApiService
 }
 
 @Composable
+fun CategoryChip(text: String, isSelected: Boolean, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (isSelected) PrimaryMarket else Color.White,
+        border = BorderStroke(1.dp, if (isSelected) PrimaryMarket else Color.LightGray),
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Text(
+            text = text,
+            color = if (isSelected) Color.White else MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
 fun ProductCard(producto: ProductModel, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            // Sombra suave tipo elevación de iOS/Marketplace
             .shadow(elevation = 4.dp, shape = RoundedCornerShape(12.dp), spotColor = Color.LightGray)
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column {
-            // Contenedor de la imagen
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(160.dp)
-                    .background(Color.White) // Fondo blanco para imágenes transparentes
+                    .background(Color.White)
                     .padding(8.dp)
             ) {
                 AsyncImage(
                     model = producto.thumbnail,
                     contentDescription = producto.title,
-                    contentScale = ContentScale.Fit, // Fit para ver el producto completo sin recortes
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
                 
-                // Botón de "Favorito" o "Etiqueta" en la esquina superior derecha
                 Surface(
                     shape = RoundedCornerShape(4.dp),
                     color = CategoryBadge,
@@ -117,10 +221,8 @@ fun ProductCard(producto: ProductModel, onClick: () -> Unit) {
                 }
             }
             
-            // Separador sutil
             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f), thickness = 1.dp)
 
-            // Contenido de texto (Abajo de la imagen)
             Column(modifier = Modifier
                 .padding(12.dp)
                 .fillMaxWidth()
@@ -130,15 +232,14 @@ fun ProductCard(producto: ProductModel, onClick: () -> Unit) {
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.secondary,
-                    maxLines = 2, // 2 líneas para títulos largos
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = 18.sp,
-                    modifier = Modifier.height(36.dp) // Altura fija para alinear las tarjetas
+                    modifier = Modifier.height(36.dp)
                 )
                 
                 Spacer(modifier = Modifier.height(6.dp))
                 
-                // Estrellas
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Filled.Star,
@@ -157,7 +258,6 @@ fun ProductCard(producto: ProductModel, onClick: () -> Unit) {
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // Precio Verde estilo oferta
                 Text(
                     text = "$${producto.price}",
                     fontWeight = FontWeight.Black,
@@ -165,7 +265,6 @@ fun ProductCard(producto: ProductModel, onClick: () -> Unit) {
                     fontSize = 18.sp
                 )
                 
-                // Envío gratis (detallito extra para que se vea real)
                 Text(
                     text = "Envío gratis",
                     fontWeight = FontWeight.Bold,
@@ -181,6 +280,7 @@ fun ProductCard(producto: ProductModel, onClick: () -> Unit) {
 @Composable
 fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiService, id: Int) {
     var producto by remember { mutableStateOf<ProductModel?>(null) }
+    val context = LocalContext.current // Contexto para usar en el Toast del botón
 
     LaunchedEffect(Unit) {
         try {
@@ -195,7 +295,6 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
             .fillMaxSize()
             .background(Color.White)
         ) {
-            // Fondo / Imagen Inmersiva en la parte superior (Fondo blanco)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -211,7 +310,6 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
                 )
             }
 
-            // Botón flotante para regresar
             IconButton(
                 onClick = { navController.popBackStack() },
                 modifier = Modifier
@@ -228,19 +326,15 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
                 )
             }
 
-            // Hoja de detalles deslizable
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 320.dp) // Deja ver la imagen de fondo
+                    .padding(top = 320.dp)
                     .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                    .background(MaterialTheme.colorScheme.background) // Gris muy claro
-                    // Sombra arriba
+                    .background(MaterialTheme.colorScheme.background)
                     .shadow(8.dp, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                     .padding(24.dp)
             ) {
-                
-                // Pastilla de arrastre (Visual)
                 Box(modifier = Modifier
                     .width(40.dp)
                     .height(4.dp)
@@ -250,7 +344,6 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Etiqueta de Marca
                 Text(
                     text = (producto!!.brand ?: producto!!.category).uppercase(),
                     color = PrimaryMarket,
@@ -260,7 +353,6 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
                 )
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Título
                 Text(
                     text = producto!!.title,
                     fontWeight = FontWeight.Black,
@@ -271,7 +363,6 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                // Rating y Vendidos
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Star, contentDescription = null, tint = RatingColor, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
@@ -284,7 +375,6 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Precio Grande y Verde
                 Text(
                     text = "$${producto!!.price}",
                     fontSize = 32.sp,
@@ -310,9 +400,11 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Botón grande de comprar
+                // Botón FUNCIONAL que muestra un mensaje (Toast)
                 Button(
-                    onClick = { /* TODO */ },
+                    onClick = { 
+                        Toast.makeText(context, "🛒 ${producto!!.title} agregado al carrito", Toast.LENGTH_SHORT).show()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
