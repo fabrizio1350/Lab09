@@ -11,8 +11,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
@@ -27,8 +29,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,21 +41,65 @@ import coil.compose.AsyncImage
 import com.example.aplicacion.ui.theme.*
 
 @Composable
+fun ScreenHome(navController: NavHostController) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.ShoppingCart,
+            contentDescription = "Tienda",
+            modifier = Modifier.size(120.dp),
+            tint = PrimaryMarket
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+        Text(
+            text = "¡Bienvenido a DummyJSON Market!",
+            fontSize = 26.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.secondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 24.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Encuentra los mejores productos a precios increíbles con envío gratis en miles de artículos.",
+            fontSize = 16.sp,
+            color = MaterialTheme.colorScheme.tertiary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 48.dp)
+        )
+        Spacer(modifier = Modifier.height(48.dp))
+        Button(
+            onClick = { navController.navigate("productos") },
+            modifier = Modifier
+                .height(56.dp)
+                .padding(horizontal = 48.dp)
+                .fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = PrimaryMarket)
+        ) {
+            Text("Explorar Catálogo", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
 fun ScreenProducts(navController: NavHostController, servicio: ProductApiService) {
     val allProducts = remember { mutableStateListOf<ProductModel>() }
     var displayedProducts by remember { mutableStateOf(listOf<ProductModel>()) }
     var cargando by remember { mutableStateOf(true) }
 
-    // Estados para Filtro y Búsqueda
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     
-    // Obtenemos las categorías únicas a partir de los productos cargados
     val categorias = remember(allProducts.size) { 
         allProducts.map { it.category }.distinct() 
     }
 
-    // Efecto para Cargar datos 1 sola vez
     LaunchedEffect(Unit) {
         try {
             val respuesta = servicio.getProducts()
@@ -64,7 +112,6 @@ fun ScreenProducts(navController: NavHostController, servicio: ProductApiService
         }
     }
 
-    // Efecto para Filtrar en tiempo real (instantáneo)
     LaunchedEffect(searchQuery, selectedCategory, allProducts.size) {
         var filtrados = allProducts.toList()
         
@@ -86,7 +133,6 @@ fun ScreenProducts(navController: NavHostController, servicio: ProductApiService
         .fillMaxSize()
         .background(MaterialTheme.colorScheme.background)
     ) {
-        // 1. Buscador
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -112,7 +158,6 @@ fun ScreenProducts(navController: NavHostController, servicio: ProductApiService
             singleLine = true
         )
 
-        // 2. Categorías Deslizables
         if (categorias.isNotEmpty()) {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -136,7 +181,6 @@ fun ScreenProducts(navController: NavHostController, servicio: ProductApiService
             }
         }
 
-        // 3. Grid de Productos o Estado de Carga
         if (cargando) {
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = PrimaryMarket)
@@ -280,7 +324,9 @@ fun ProductCard(producto: ProductModel, onClick: () -> Unit) {
 @Composable
 fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiService, id: Int) {
     var producto by remember { mutableStateOf<ProductModel?>(null) }
-    val context = LocalContext.current // Contexto para usar en el Toast del botón
+    val context = LocalContext.current
+    val scrollState = rememberScrollState() // Agregamos estado para hacer scroll
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
 
     LaunchedEffect(Unit) {
         try {
@@ -295,10 +341,11 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
             .fillMaxSize()
             .background(Color.White)
         ) {
+            // Fondo con la imagen (fija atrás)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(350.dp)
+                    .height(380.dp)
                     .background(Color.White)
                     .padding(32.dp)
             ) {
@@ -310,6 +357,110 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
                 )
             }
 
+            // Capa deslizable (Scroll) que pasa por encima de la imagen
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                // Espacio transparente para ver la imagen de fondo antes de scrollear
+                Spacer(modifier = Modifier.height(340.dp))
+                
+                // Contenido blanco
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = screenHeight - 340.dp)
+                        .shadow(16.dp, RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                        .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(24.dp)
+                ) {
+                    Box(modifier = Modifier
+                        .width(40.dp)
+                        .height(4.dp)
+                        .clip(CircleShape)
+                        .background(Color.LightGray)
+                        .align(Alignment.CenterHorizontally)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = (producto!!.brand ?: producto!!.category).uppercase(),
+                        color = PrimaryMarket,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = producto!!.title,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 24.sp,
+                        color = MaterialTheme.colorScheme.secondary,
+                        lineHeight = 30.sp
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Star, contentDescription = null, tint = RatingColor, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "${producto!!.rating}", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "•", color = Color.LightGray)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "+1000 vendidos", fontSize = 14.sp, color = MaterialTheme.colorScheme.tertiary)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "$${producto!!.price}",
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = PriceColor
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+                    
+                    Text(
+                        text = "Acerca de este artículo",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = producto!!.description,
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        lineHeight = 22.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(48.dp)) // Espaciado extra abajo para poder scrollear bien
+
+                    Button(
+                        onClick = { 
+                            Toast.makeText(context, "🛒 ${producto!!.title} agregado al carrito", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryMarket)
+                    ) {
+                        Icon(imageVector = Icons.Outlined.ShoppingCart, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Agregar al carrito", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+
+            // Botón regresar (fijo arriba)
             IconButton(
                 onClick = { navController.popBackStack() },
                 modifier = Modifier
@@ -324,97 +475,6 @@ fun ScreenProductDetail(navController: NavHostController, servicio: ProductApiSe
                     contentDescription = "Regresar",
                     tint = MaterialTheme.colorScheme.secondary
                 )
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 320.dp)
-                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                    .background(MaterialTheme.colorScheme.background)
-                    .shadow(8.dp, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                    .padding(24.dp)
-            ) {
-                Box(modifier = Modifier
-                    .width(40.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray)
-                    .align(Alignment.CenterHorizontally)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = (producto!!.brand ?: producto!!.category).uppercase(),
-                    color = PrimaryMarket,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = producto!!.title,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 22.sp,
-                    color = MaterialTheme.colorScheme.secondary,
-                    lineHeight = 28.sp
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Star, contentDescription = null, tint = RatingColor, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "${producto!!.rating}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "•", color = Color.LightGray)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "+1000 vendidos", fontSize = 12.sp, color = MaterialTheme.colorScheme.tertiary)
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = "$${producto!!.price}",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = PriceColor
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                Text(
-                    text = "Acerca de este artículo",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = producto!!.description,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    lineHeight = 20.sp
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Botón FUNCIONAL que muestra un mensaje (Toast)
-                Button(
-                    onClick = { 
-                        Toast.makeText(context, "🛒 ${producto!!.title} agregado al carrito", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryMarket)
-                ) {
-                    Icon(imageVector = Icons.Outlined.ShoppingCart, contentDescription = null, tint = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Agregar al carrito", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
             }
         }
     } else {
